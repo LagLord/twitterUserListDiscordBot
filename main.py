@@ -9,12 +9,13 @@ import json
 
 webhook = SyncWebhook.from_url(
     webhook_url
-    )  # Initializing webhook
+)  # Initializing webhook
 
 
 # Importing discord.Webhook and discord.RequestsWebhookAdapter as well as Embed class
 def send_tweet(msg, author, media):
-    embed = Embed(title="\u200B", description=f"{msg['text']}", timestamp=datetime.datetime.strptime(msg['created_at'], "%Y-%m-%dT%H:%M:%S.%fZ"),
+    embed = Embed(title="\u200B", description=f"{msg['text']}",
+                  timestamp=datetime.datetime.strptime(msg['created_at'], "%Y-%m-%dT%H:%M:%S.%fZ"),
                   colour=0xA020F0)  # Initializing an
 
     embed.add_field(name="Likes:", value=f"{msg['public_metrics']['like_count']}")  # Adding a new field
@@ -100,7 +101,6 @@ def get_data_from_spreadsheet():
     return messages_list[0]
 
 
-
 # print(rules)
 
 # tweet_thread = Thread(target=run_tweet_grabber, args=())
@@ -118,52 +118,55 @@ client = tweepy.Client(
 )
 
 while True:
-    result = client.get_list_tweets(id='7450', expansions=["author_id", "attachments.media_keys"],
-                                    tweet_fields=['attachments', 'public_metrics', 'created_at', 'author_id'],
-                                    user_fields=['profile_image_url', 'username'],
-                                    media_fields=['url', 'preview_image_url'], max_results=max_tweets,
-                                    pagination_token=next_token)
-    # next_token = result['meta']['previous_token']
-    cur_hour = datetime.datetime.now().hour
-    if hour != cur_hour:
-        main_msg = get_data_from_spreadsheet()
-        hour = cur_hour
-
-    tweet_data = result['data']
-
-    user_data = result['includes']['users']
     try:
-        media_data = result['includes']['media']
-    except:
-        media_data = []
+        result = client.get_list_tweets(id='7450', expansions=["author_id", "attachments.media_keys"],
+                                        tweet_fields=['attachments', 'public_metrics', 'created_at', 'author_id'],
+                                        user_fields=['profile_image_url', 'username'],
+                                        media_fields=['url', 'preview_image_url'], max_results=max_tweets,
+                                        pagination_token=next_token)
+        # next_token = result['meta']['previous_token']
+        cur_hour = datetime.datetime.now().hour
+        if hour != cur_hour:
+            main_msg = get_data_from_spreadsheet()
+            hour = cur_hour
 
-    print(result, "Next token: ", result['meta'])
+        tweet_data = result['data']
 
-    print('Tweet DATA: ', len(tweet_data), tweet_data[0])
-    print('USERS DATA: ', len(user_data), user_data[0])
-    # print('MEDIA DATA: ', len(media_data), media_data[0])
+        user_data = result['includes']['users']
+        try:
+            media_data = result['includes']['media']
+        except:
+            media_data = []
 
-    for tweet in tweet_data:
+        print(result, "Next token: ", result['meta'])
 
-        if tweet['id'] in past_tweet_ids:
-            continue
+        print('Tweet DATA: ', len(tweet_data), tweet_data[0])
+        print('USERS DATA: ', len(user_data), user_data[0])
+        # print('MEDIA DATA: ', len(media_data), media_data[0])
 
-        author_id = tweet['author_id']
-        if 'attachments' in tweet:
-            try:
-                media_key = tweet['attachments']['media_keys'][0]
-                media_tweet = [i for i in media_data if i['media_key'] == media_key][0]
-            except:
+        for tweet in tweet_data:
+
+            if tweet['id'] in past_tweet_ids:
+                continue
+
+            author_id = tweet['author_id']
+            if 'attachments' in tweet:
+                try:
+                    media_key = tweet['attachments']['media_keys'][0]
+                    media_tweet = [i for i in media_data if i['media_key'] == media_key][0]
+                except:
+                    media_tweet = {}
+
+            else:
                 media_tweet = {}
 
-        else:
-            media_tweet = {}
+            user = [i for i in user_data if i['id'] == author_id][0]
 
-        user = [i for i in user_data if i['id'] == author_id][0]
+            send_tweet(tweet, user, media_tweet)
+            past_tweet_ids = [i['id'] for i in tweet_data]
 
-        send_tweet(tweet, user, media_tweet)
-        past_tweet_ids = [i['id'] for i in tweet_data]
-
+    except:
+        pass
     time.sleep(12)
 # while True:
 #     time.sleep(3600)
